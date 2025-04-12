@@ -2,10 +2,12 @@ const express = require("express");
 const courseRouter = express.Router();
 const courseController = require("../controllers/courseController");
 
-// Route GET: Lấy tất cả courses
+// CRUD
 courseRouter.get("/", courseController.getAllCourses);
-
-// Route POST: Tạo course mới
+courseRouter.get("/category-counts", courseController.getCategoryCounts);
+courseRouter.get("/:id", courseController.getCourseById);
 courseRouter.post("/", courseController.createCourse);
+courseRouter.put("/:id", courseController.updateCourse);
+
 
 module.exports = courseRouter;

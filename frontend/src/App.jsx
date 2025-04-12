@@ -1,21 +1,119 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Home from "./components/Home/Home";
-import Header from "./components/Header/Header";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import AppLayout from "./layout/AppLayout";
+import AdminLayout from "./layout/AdminLayout";
+import AuthLayout from "./layout/AuthLayout";
+import Home from "./pages/home/Home";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import Users from "./pages/users/Users";
+import Courses from "./pages/courses/Courses";
+import CourseDetail from "./pages/courses/CourseDetail"; // Thêm import
+import Lessons from "./pages/lessons/Lessons";
+import Enrollments from "./pages/enrollments/Enrollments";
+import Dashboard from "./pages/dashboard/Dashboard";
+import NotFound from "./pages/notfound/NotFound";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
 
-function App() {
+const App = () => {
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-100">
-        <Header/>
-        <h1 className="text-3xl font-bold text-center py-8">
-          Welcome to EduPress main page
-        </h1>
+    <AuthProvider>
+      <Router>
         <Routes>
-          <Route path="/home" element={<Home />} />
+          <Route path="/" element={<Navigate to="/home" />} />
+          <Route
+            path="/home"
+            element={
+              <AppLayout>
+                <Home />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/courses"
+            element={
+              <AppLayout>
+                <Courses />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/courses/:id"
+            element={
+              <AppLayout>
+                <CourseDetail />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/lessons"
+            element={
+              <AppLayout>
+                <Lessons />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/enrollments"
+            element={
+              <AppLayout>
+                <Enrollments />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <AuthLayout>
+                <Login />
+              </AuthLayout>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <AuthLayout>
+                <Register />
+              </AuthLayout>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminLayout>
+                  <Users />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminLayout>
+                  <Dashboard />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <AppLayout>
+                <NotFound />
+              </AppLayout>
+            }
+          />
         </Routes>
-      </div>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
-}
+};
 
 export default App;

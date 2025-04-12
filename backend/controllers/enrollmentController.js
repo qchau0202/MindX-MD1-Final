@@ -5,7 +5,7 @@ const { body, validationResult } = require("express-validator");
 const getAllEnrollments = async (req, res) => {
   try {
     const enrollments = await Enrollment.find()
-      .populate("customer_id", "name email") // ✅ sửa đúng field
+      .populate("customer_id", "name email")
       .populate("course_id", "title");
 
     return res.status(200).json({ success: true, data: enrollments });
