@@ -2,18 +2,18 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// Đăng ký
+// Register
 const register = async (req, res) => {
   const { email, password, name, role } = req.body;
 
   try {
-    // Ngăn người khác đăng ký role admin
+    // Prevent multiple admins
     if (role === "admin") {
       const existingAdmin = await User.findOne({ role: "admin" });
       if (existingAdmin) {
         return res
           .status(403)
-          .json({ success: false, message: "Admin đã tồn tại" });
+          .json({ success: false, message: "Admin existed" });
       }
     }
 
@@ -21,7 +21,7 @@ const register = async (req, res) => {
     if (existingUser) {
       return res
         .status(400)
-        .json({ success: false, message: "Email đã được sử dụng" });
+        .json({ success: false, message: "Email has been used" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -38,13 +38,13 @@ const register = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json({ success: false, message: "Lỗi khi đăng ký: " + error.message });
+      .json({ success: false, message: "Login error: " + error.message });
   }
 };
 
-// Đăng nhập
+// Login
 const login = async (req, res) => {
-  console.log("Login request body:", req.body); // Log the request body
+  console.log("Login request body:", req.body);
   const { email, password } = req.body;
 
   try {
@@ -52,11 +52,11 @@ const login = async (req, res) => {
     if (!user)
       return res
         .status(400)
-        .json({ success: false, message: "Tài khoản không tồn tại" });
+        .json({ success: false, message: "Account has already existed" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(401).json({ success: false, message: "Sai mật khẩu" });
+      return res.status(401).json({ success: false, message: "Incorrect password" });
 
     const token = jwt.sign(
       {
@@ -82,18 +82,18 @@ const login = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json({ success: false, message: "Lỗi khi đăng nhập: " + error.message });
+      .json({ success: false, message: "Login error: " + error.message });
   }
 };
 
-// Lấy thông tin user hiện tại
+// Get current user
 const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Người dùng không tồn tại",
+        message: "User not existed",
       });
     }
     return res.status(200).json({
@@ -104,7 +104,7 @@ const getCurrentUser = async (req, res) => {
     console.error("Error getting current user:", error);
     return res.status(500).json({
       success: false,
-      message: "Lỗi khi lấy thông tin người dùng: " + error.message,
+      message: "Error fetching user data: " + error.message,
     });
   }
 };

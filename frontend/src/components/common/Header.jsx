@@ -1,8 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { Button, Tag, Dropdown, message } from "antd";
-import { UserOutlined, LogoutOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import {
+  UserOutlined,
+  LogoutOutlined,
+  ProfileOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
+
 const Header = () => {
   const { user, logout } = useAuth();
   const [messageApi, contextHolder] = message.useMessage();
@@ -11,7 +16,7 @@ const Header = () => {
   const success = () => {
     messageApi.open({
       type: "success",
-      content: "Đăng xuất thành công!",
+      content: "Logout successfuly!",
       duration: 2,
     });
   };
@@ -20,12 +25,12 @@ const Header = () => {
     try {
       logout();
       success();
-      navigate("/home")
+      navigate("/home");
     } catch (err) {
       console.error("Logout error:", err);
       messageApi.open({
         type: "error",
-        content: "Đăng xuất thất bại!",
+        content: "Logout error!",
         duration: 2,
       });
     }
@@ -42,29 +47,57 @@ const Header = () => {
 
   const dropdownItems = [
     {
+      key: "profile",
+      icon: <ProfileOutlined />,
+      label: "My profile",
+      onClick: () => navigate("/profile"),
+    },
+    ...(user?.role === "provider"
+      ? [
+          {
+            key: "create-course",
+            icon: <PlusOutlined />,
+            label: "Create course",
+            onClick: () => navigate("/profile/provider/create"),
+          },
+        ]
+      : []),
+    {
       key: "logout",
       icon: <LogoutOutlined />,
-      label: "Đăng xuất",
+      label: "Log out",
       onClick: handleLogout,
     },
   ];
 
   return (
-    <div className="bg-white px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
+    <div className="bg-white px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-md">
       {contextHolder}
-      <Link to="/" className="text-xl font-bold text-blue-600">
+      <Link
+        to="/"
+        className="text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors"
+      >
         EduPress
       </Link>
       <div className="flex items-center gap-4">
         {!user && (
           <>
             <Link to="/login">
-              <Button type="primary" aria-label="Đăng nhập">
-                Đăng nhập
+              <Button
+                type="primary"
+                aria-label="Login"
+                className="bg-blue-600 hover:bg-blue-700 transition-all rounded-lg"
+              >
+                Login
               </Button>
             </Link>
             <Link to="/register">
-              <Button aria-label="Đăng ký">Đăng ký</Button>
+              <Button
+                aria-label="Register"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-lg"
+              >
+                Register
+              </Button>
             </Link>
           </>
         )}
@@ -73,11 +106,14 @@ const Header = () => {
           <Dropdown
             menu={{ items: dropdownItems }}
             placement="bottomRight"
-            aria-label="Menu người dùng"
+            trigger={["hover"]}
+            aria-label="User menu"
           >
-            <div className="flex items-center gap-2 cursor-pointer">
-              <UserOutlined />
-              <span className="font-medium">{user?.name || "Người dùng"}</span>
+            <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-all">
+              <UserOutlined className="text-blue-600 text-lg" />
+              <span className="font-medium text-gray-800">
+                {user?.name || "User"}
+              </span>
               <Tag color={getRoleColor(user?.role)} className="capitalize">
                 {user?.role || "unknown"}
               </Tag>

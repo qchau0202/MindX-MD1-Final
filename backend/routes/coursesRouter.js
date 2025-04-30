@@ -6,7 +6,7 @@ const courseController = require("../controllers/courseController");
 courseRouter.get("/", courseController.getAllCourses);
 courseRouter.get("/category-counts", courseController.getCategoryCounts);
 courseRouter.get("/:id", courseController.getCourseById);
-courseRouter.post("/", courseController.createCourse);
+courseRouter.post("/provider/create", courseController.createCourse);
 courseRouter.put("/:id", courseController.updateCourse);
 
 

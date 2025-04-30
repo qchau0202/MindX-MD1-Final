@@ -3,12 +3,12 @@ import { getCurrentUser } from "../services/api";
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
 
-  // Khôi phục trạng thái đăng nhập khi reload
+  // Restore session on initial load
   useEffect(() => {
     const restoreSession = async () => {
       if (token) {
@@ -51,4 +51,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+const useAuth = () => useContext(AuthContext);
+
+export { AuthProvider, useAuth };

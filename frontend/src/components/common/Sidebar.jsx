@@ -1,4 +1,3 @@
-// src/components/common/Sidebar.jsx
 import { Link, useLocation } from "react-router-dom";
 import { Menu } from "antd";
 import { DashboardOutlined, UserOutlined } from "@ant-design/icons";
@@ -10,12 +9,12 @@ const Sidebar = () => {
     {
       key: "/dashboard",
       icon: <DashboardOutlined />,
-      label: <Link to="/dashboard">Bảng điều khiển</Link>,
+      label: <Link to="/dashboard">Dashboard</Link>,
     },
     {
       key: "/users",
       icon: <UserOutlined />,
-      label: <Link to="/users">Quản lý người dùng</Link>,
+      label: <Link to="/users">User management</Link>,
     },
   ];
 

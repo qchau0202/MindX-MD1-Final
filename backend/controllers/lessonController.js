@@ -1,7 +1,7 @@
 const Lesson = require("../models/Lesson");
 const { body, validationResult } = require("express-validator");
 
-// Lấy tất cả lessons
+// Get all lessons
 const getAllLessons = async (req, res) => {
   try {
     const lessons = await Lesson.find().populate("course_id", "title");
@@ -9,29 +9,29 @@ const getAllLessons = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Lỗi khi lấy danh sách bài giảng: " + error.message,
+      message: "Error: " + error.message,
     });
   }
 };
 
-// Tạo mới lesson
+// Create new lesson
 const createLesson = [
   body("course_id")
     .notEmpty()
-    .withMessage("Course ID là bắt buộc")
+    .withMessage("Course ID is required")
     .isMongoId()
-    .withMessage("Course ID không hợp lệ"),
+    .withMessage("Course ID is not valid"),
   body("title")
     .notEmpty()
-    .withMessage("Tiêu đề là bắt buộc")
+    .withMessage("Title is required")
     .isString()
-    .withMessage("Tiêu đề phải là chuỗi"),
-  body("video_url").optional().isURL().withMessage("Video URL không hợp lệ"),
-  body("content").optional().isString().withMessage("Nội dung phải là chuỗi"),
+    .withMessage("Title must be a string"),
+  body("video_url").optional().isURL().withMessage("Video URL is not valid"),
+  body("content").optional().isString().withMessage("Content must be a string"),
   body("order")
     .optional()
     .isInt({ min: 0 })
-    .withMessage("Thứ tự phải là số nguyên không âm"),
+    .withMessage("Order must be a non-negative integer"),
 
   async (req, res) => {
     const errors = validationResult(req);
@@ -61,7 +61,7 @@ const createLesson = [
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Lỗi khi tạo bài giảng: " + error.message,
+        message: "Error creating lesson: " + error.message,
       });
     }
   },

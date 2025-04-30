@@ -2,8 +2,9 @@ const User = require("../models/User");
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 
-// Lấy tất cả user
+// Get all users
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find();
@@ -12,10 +13,31 @@ const getAllUsers = async (req, res) => {
     console.error("Error retrieving users:", error);
     return res.status(500).json({
       success: false,
-      message: "Lỗi server: " + error.message,
+      message: "Server error: " + error.message,
     });
   }
 };
+
+// Get user by ID
+const getUserById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    return res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error("Error retrieving user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error: " + error.message,
+    });
+  }
+}
 
 // Tạo user mới
 const createUser = async (req, res) => {
@@ -37,7 +59,7 @@ const createUser = async (req, res) => {
     if (!email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "Thiếu các trường bắt buộc: email, password, role",
+        message: "Fields are required: email, password, role",
       });
     }
 
@@ -45,7 +67,7 @@ const createUser = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "Email đã được sử dụng",
+        message: "Email already exists",
       });
     }
 
@@ -86,94 +108,292 @@ const createUser = async (req, res) => {
     }
     return res.status(500).json({
       success: false,
-      message: "Lỗi khi tạo user: " + error.message,
+      message: "Error creating user: " + error.message,
     });
   }
 };
 
-// Đăng ký khóa học
+// Enroll course
 const enrollCourse = async (req, res) => {
   try {
     const user = req.user;
     const { course_id } = req.body;
 
-    console.log("Enroll request:", { user, course_id }); // Debug
+    console.log("Enroll request:", { user, course_id });
 
-    // Kiểm tra đăng nhập
+    // Check login
     if (!user || !user.id) {
       return res.status(401).json({
         success: false,
-        message: "Phiên đăng nhập không hợp lệ",
+        message: "Login session is invalid",
       });
     }
 
-    // Kiểm tra user tồn tại
+    // Check user data
     const userData = await User.findById(user.id);
     console.log("User found:", userData);
     if (!userData) {
       return res.status(404).json({
         success: false,
-        message: "Người dùng không tồn tại",
+        message: "User not found",
       });
     }
 
-    // Kiểm tra khóa học tồn tại
+    // Check course existence
+    if (!mongoose.Types.ObjectId.isValid(course_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID course is invalid",
+      });
+    }
     const course = await Course.findById(course_id);
     console.log("Course found:", course);
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: "Khóa học không tồn tại",
+        message: "Course not found",
       });
     }
 
-    // Kiểm tra đã đăng ký chưa
-    const existingEnrollment = await Enrollment.findOne({
+    // Check enrollment existence
+    let enrollment = await Enrollment.findOne({
       customer_id: user.id,
       course_id,
     });
-    if (existingEnrollment) {
-      return res.status(400).json({
-        success: false,
-        message: "Bạn đã đăng ký khóa học này",
+
+    if (enrollment) {
+      if (enrollment.enrolled_status) {
+        return res.status(400).json({
+          success: false,
+          message: "You have already enrolled in this course",
+        });
+      } else {
+        enrollment.enrolled_status = true;
+        enrollment.enrollment_date = new Date();
+        enrollment.unenrollment_date = null;
+        await enrollment.save();
+        console.log("Enrollment reactivated:", enrollment);
+      }
+    } else {
+      enrollment = new Enrollment({
+        customer_id: user.id,
+        course_id,
+        enrollment_date: new Date(),
+        enrolled_status: true,
+        unenrollment_date: null,
       });
+      await enrollment.save();
+      console.log("Enrollment created:", enrollment);
+    }
+    if (!userData.course_id.includes(course_id)) {
+      userData.course_id.push(course_id);
+      userData.enrolled = true;
+      await userData.save();
+      console.log("User updated:", userData);
     }
 
-    // Tạo bản ghi Enrollment
-    const enrollment = new Enrollment({
-      customer_id: user.id,
-      course_id,
-    });
-    await enrollment.save();
-
-    // Cập nhật Course
     course.enrolled_students = (course.enrolled_students || 0) + 1;
+    course.active_students = (course.active_students || 0) + 1;
     await course.save();
+    console.log("Course updated:", course);
 
-    // Cập nhật total_students của provider
-    const provider = await User.findById(course.provider_id);
-    if (provider && provider.role === "provider") {
-      provider.provider_info.total_students =
-        (provider.provider_info.total_students || 0) + 1;
-      await provider.save();
+    if (course.provider_id) {
+      const provider = await User.findById(course.provider_id);
+      if (provider && provider.role === "provider") {
+        const providerCourses = await Course.find(
+          { provider_id: course.provider_id },
+          { _id: 1 }
+        );
+        const courseIds = providerCourses.map((c) => c._id);
+        console.log("Provider courses:", courseIds);
+
+        const distinctStudents = await Enrollment.distinct("customer_id", {
+          course_id: { $in: courseIds },
+          enrolled_status: true,
+        });
+        provider.provider_info.total_students = distinctStudents.length;
+        provider.provider_info.course_count = providerCourses.length;
+        await provider.save();
+        console.log("Provider updated:", provider);
+      }
     }
 
     return res.status(200).json({
       success: true,
-      message: "Đăng ký khóa học thành công",
+      message: "Enrolled in course successfully",
       data: { user: userData, course, enrollment },
     });
   } catch (error) {
-    console.error("Error enrolling course:", error);
+    console.error("Error enrolling course:", {
+      message: error.message,
+      stack: error.stack,
+    });
     return res.status(500).json({
       success: false,
-      message: `Lỗi khi đăng ký khóa học: ${error.message}`,
+      message: `Error enroll course: ${error.message}`,
+    });
+  }
+};
+
+// Unenroll course
+const unenrollCourse = async (req, res) => {
+  try {
+    const user = req.user;
+    const { course_id } = req.body;
+
+    console.log("Unenroll request:", { user, course_id });
+
+    if (!user || !user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Login session is invalid",
+      });
+    }
+
+    // Check user existence
+    const userData = await User.findById(user.id);
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    console.log("User found:", userData._id);
+
+    // Check course existence
+    if (!mongoose.Types.ObjectId.isValid(course_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Course ID is invalid",
+      });
+    }
+    const course = await Course.findById(course_id);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+    console.log("Course found:", course._id);
+
+    const enrollment = await Enrollment.findOne({
+      customer_id: user.id,
+      course_id,
+      enrolled_status: true,
+    });
+    if (!enrollment) {
+      return res.status(400).json({
+        success: false,
+        message: "You have not enrolled in this course or cancelled before",
+      });
+    }
+    console.log("Enrollment found:", enrollment._id);
+
+    enrollment.enrolled_status = false;
+    enrollment.unenrollment_date = new Date();
+    await enrollment.save();
+    console.log("Enrollment updated:", enrollment);
+
+    userData.course_id = userData.course_id.filter(
+      (id) => id.toString() !== course_id.toString()
+    );
+    userData.enrolled = userData.course_id.length > 0;
+    await userData.save();
+    console.log("User data updated:", userData);
+
+    course.enrolled_students = Math.max((course.enrolled_students || 0) - 1, 0);
+    course.active_students = Math.max((course.active_students || 0) - 1, 0);
+    await course.save();
+    console.log("Course updated:", course);
+
+    if (course.provider_id) {
+      const provider = await User.findById(course.provider_id);
+      if (provider && provider.role === "provider") {
+        const providerCourses = await Course.find(
+          { provider_id: course.provider_id },
+          { _id: 1 }
+        );
+        const courseIds = providerCourses.map((c) => c._id);
+        console.log("Provider courses:", courseIds);
+
+        const distinctStudents = await Enrollment.distinct("customer_id", {
+          course_id: { $in: courseIds },
+          enrolled_status: true,
+        });
+        console.log("Distinct students:", distinctStudents);
+
+        provider.provider_info.total_students = distinctStudents.length;
+        await provider.save();
+        console.log("Provider updated:", provider._id);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Unenrolled from course successfully",
+    });
+  } catch (error) {
+    console.error("Error unenrolling course:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({
+      success: false,
+      message: `Error unenroll course: ${error.message}`,
+    });
+  }
+};
+
+// Get enrollments
+const getEnrollments = async (req, res) => {
+  try {
+    const user = req.user;
+    console.log("req.user in getEnrollments:", user);
+    if (!user || !user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Login session is invalid",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(user.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is invalid",
+      });
+    }
+
+    const enrollments = await Enrollment.find({
+      customer_id: user.id,
+      enrolled_status: true, // Chỉ lấy các bản ghi đang active
+    })
+      .populate("course_id", "title image")
+      .populate("customer_id", "name email");
+
+    if (!enrollments || enrollments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: "No enrollments found",
+      });
+    }
+
+    console.log("Enrollments found:", enrollments);
+    return res.status(200).json({ success: true, data: enrollments });
+  } catch (error) {
+    console.error("Error retrieving enrollments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching data: " + error.message,
     });
   }
 };
 
 module.exports = {
   getAllUsers,
+  getUserById,
+  getEnrollments,
   createUser,
   enrollCourse,
+  unenrollCourse,
 };

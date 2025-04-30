@@ -4,7 +4,6 @@ const api = axios.create({
   baseURL: "http://localhost:5000/api",
 });
 
-// Thêm token vào header nếu có
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -16,25 +15,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Test backend
-export const testBackend = () => api.get("/");
-
-// CRUD APIs
 // Courses
 export const getCourses = () => api.get("/courses");
 export const getCategoryCounts = () => api.get("/courses/category-counts");
-export const createCourse = (data) => api.post("/courses", data);
+export const createCourse = (data) =>
+  api.post("/courses/provider/create", data);
 export const getCourseById = (id) => api.get(`/courses/${id}`);
 
 // Users
 export const getUsers = () => api.get("/users");
+export const getUserById = (id) => api.get(`/users/${id}`);
+export const getEnrollments = () => api.get("/users/enrollments");
 export const enrollCourse = (data) => api.post("/users/enroll", data);
+export const unenrollCourse = (data) => api.post("/users/unenroll", data);
 
 // Lessons
 export const getLessons = () => api.get("/lessons");
-
-// Enrollments
-export const getEnrollments = () => api.get("/enrollments");
 
 // Auth APIs
 export const login = (data) => api.post("/auth/login", data);

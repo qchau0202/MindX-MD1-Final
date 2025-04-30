@@ -2,22 +2,40 @@ const Course = require("../models/Course");
 const Category = require("../models/Category");
 const User = require("../models/User");
 
-// Lấy tất cả courses
+// Get all courses
 const getAllCourses = async (req, res) => {
   try {
-    const courses = await Course.find()
+    const { page = 1, limit = 10, category, level, search } = req.query;
+    const query = {};
+
+    if (category) query.categories = category;
+    if (level) query.level = level;
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    const courses = await Course.find(query)
       .populate("categories", "name")
-      .populate("provider_id", "name");
-    return res.status(200).json({ success: true, data: courses });
+      .populate("provider_id", "name")
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const total = await Course.countDocuments(query);
+
+    return res.status(200).json({
+      success: true,
+      data: courses,
+      pagination: { page, limit, total },
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Lỗi server: " + error.message,
+      message: "Server error: " + error.message,
     });
   }
 };
 
-// Lấy khóa học theo ID
+// Get course by ID
 const getCourseById = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
@@ -26,26 +44,53 @@ const getCourseById = async (req, res) => {
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: "Khóa học không tồn tại",
+        message: "Course not found",
       });
     }
     return res.status(200).json({ success: true, data: course });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Lỗi server: " + error.message,
+      message: "Server error: " + error.message,
     });
   }
 };
 
-// Tạo course mới
+// Get courses of provider
+const getProviderCourses = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== "provider") {
+      return res.status(403).json({
+        success: false,
+        message: "Only providers can access this route",
+      });
+    }
+
+    const courses = await Course.find({ provider_id: user._id })
+      .populate("categories", "name")
+      .populate("provider_id", "name");
+
+    return res.status(200).json({
+      success: true,
+      data: courses,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error: " + error.message,
+    });
+  }
+};
+
+// Create new course
 const createCourse = async (req, res) => {
   try {
     const user = req.user;
     if (!user || user.role !== "provider") {
       return res.status(403).json({
         success: false,
-        message: "Chỉ provider được tạo khóa học",
+        message: "Only providers can create courses",
       });
     }
 
@@ -59,14 +104,15 @@ const createCourse = async (req, res) => {
       duration,
       capacity,
       location,
+      status,
     } = req.body;
 
-    // Validation cơ bản
+    // Validation
     if (!title || !price || !number_of_lessons || !duration || !location) {
       return res.status(400).json({
         success: false,
         message:
-          "Thiếu các trường bắt buộc: title, price, number_of_lessons, duration, location",
+          "Fields are required: title, price, number_of_lessons, duration, location",
       });
     }
 
@@ -81,14 +127,14 @@ const createCourse = async (req, res) => {
       duration,
       capacity: capacity || "unlimited",
       location,
-      enrolled_students: 0, // Khởi tạo
+      enrolled_students: 0,
       rating: null,
+      status: status || "draft",
     };
 
     const course = new Course(courseData);
     const saved = await course.save();
 
-    // Cập nhật course_count của provider
     await User.findByIdAndUpdate(user._id, {
       $inc: { "provider_info.course_count": 1 },
     });
@@ -108,19 +154,19 @@ const createCourse = async (req, res) => {
     }
     return res.status(500).json({
       success: false,
-      message: "Lỗi khi tạo course: " + error.message,
+      message: "Error creating course: " + error.message,
     });
   }
 };
 
-// Cập nhật khóa học
+// Update course
 const updateCourse = async (req, res) => {
   try {
     const user = req.user;
     if (!user || user.role !== "provider") {
       return res.status(403).json({
         success: false,
-        message: "Chỉ provider được cập nhật khóa học",
+        message: "Only providers can update courses",
       });
     }
 
@@ -128,14 +174,14 @@ const updateCourse = async (req, res) => {
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: "Khóa học không tồn tại",
+        message: "Course not found",
       });
     }
 
     if (course.provider_id.toString() !== user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Bạn không có quyền cập nhật khóa học này",
+        message: "You are not authorized to update this course",
       });
     }
 
@@ -188,12 +234,12 @@ const updateCourse = async (req, res) => {
     }
     return res.status(500).json({
       success: false,
-      message: "Lỗi khi cập nhật course: " + error.message,
+      message: "Error updating course: " + error.message,
     });
   }
 };
 
-// Lấy số lượng khóa học theo danh mục
+// Get category counts
 const getCategoryCounts = async (req, res) => {
   try {
     const counts = await Course.aggregate([
@@ -225,7 +271,7 @@ const getCategoryCounts = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Lỗi server: " + error.message,
+      message: "Server error: " + error.message,
     });
   }
 };
@@ -233,6 +279,7 @@ const getCategoryCounts = async (req, res) => {
 module.exports = {
   getAllCourses,
   getCourseById,
+  getProviderCourses,
   createCourse,
   updateCourse,
   getCategoryCounts,
